@@ -5,17 +5,6 @@ import (
 	"time"
 )
 
-type RecurrenceType string
-
-const (
-	RecurrenceNone          RecurrenceType = "none"
-	RecurrenceDailyEveryN   RecurrenceType = "daily_every_n"
-	RecurrenceMonthlyDay    RecurrenceType = "monthly_day"
-	RecurrenceSpecificDates RecurrenceType = "specific_dates"
-	RecurrenceEvenDays      RecurrenceType = "even_days"
-	RecurrenceOddDays       RecurrenceType = "odd_days"
-)
-
 type Status string
 
 const (
