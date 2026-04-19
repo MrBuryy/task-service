@@ -1,0 +1,7 @@
+ALTER TABLE tasks
+ADD COLUMN scheduled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ADD COLUMN recurrence_type TEXT NOT NULL DEFAULT 'none',
+ADD COLUMN recurrence_config JSONB;
+
+ALTER TABLE tasks
+ALTER COLUMN scheduled_at DROP DEFAULT;

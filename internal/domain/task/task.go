@@ -1,6 +1,20 @@
 package task
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+type RecurrenceType string
+
+const (
+	RecurrenceNone          RecurrenceType = "none"
+	RecurrenceDailyEveryN   RecurrenceType = "daily_every_n"
+	RecurrenceMonthlyDay    RecurrenceType = "monthly_day"
+	RecurrenceSpecificDates RecurrenceType = "specific_dates"
+	RecurrenceEvenDays      RecurrenceType = "even_days"
+	RecurrenceOddDays       RecurrenceType = "odd_days"
+)
 
 type Status string
 
@@ -11,12 +25,15 @@ const (
 )
 
 type Task struct {
-	ID          int64     `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Status      Status    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID               int64
+	Title            string
+	Description      string
+	Status           Status
+	ScheduledAt      time.Time
+	RecurrenceType   RecurrenceType
+	RecurrenceConfig json.RawMessage
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 func (s Status) Valid() bool {
