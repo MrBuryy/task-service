@@ -478,3 +478,454 @@ func TestService_Complete(t *testing.T) {
 		})
 	}
 }
+
+func TestService_Create(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+
+	t.Run("success with normalized input and timestamps", func(t *testing.T) {
+		t.Parallel()
+
+		var createdModel *taskdomain.Task
+
+		repo := &mockRepository{
+			createFn: func(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
+				createdModel = task
+				return task, nil
+			},
+		}
+
+		svc := NewService(repo)
+		svc.now = func() time.Time { return now }
+
+		input := CreateInput{
+			Title:            "  Pay rent  ",
+			Description:      "  monthly payment  ",
+			RecurrenceType:   taskdomain.RecurrenceMonthlyDay,
+			RecurrenceConfig: json.RawMessage(`{"day":1}`),
+		}
+
+		got, err := svc.Create(context.Background(), input)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if createdModel == nil {
+			t.Fatal("expected repo.Create to be called")
+		}
+
+		if createdModel.Title != "Pay rent" {
+			t.Fatalf("title = %q, want %q", createdModel.Title, "Pay rent")
+		}
+
+		if createdModel.Description != "monthly payment" {
+			t.Fatalf("description = %q, want %q", createdModel.Description, "monthly payment")
+		}
+
+		if createdModel.Status != taskdomain.StatusNew {
+			t.Fatalf("status = %q, want %q", createdModel.Status, taskdomain.StatusNew)
+		}
+
+		if createdModel.RecurrenceType != taskdomain.RecurrenceMonthlyDay {
+			t.Fatalf("recurrence type = %q, want %q", createdModel.RecurrenceType, taskdomain.RecurrenceMonthlyDay)
+		}
+
+		if string(createdModel.RecurrenceConfig) != `{"day":1}` {
+			t.Fatalf("recurrence config = %s, want %s", string(createdModel.RecurrenceConfig), `{"day":1}`)
+		}
+
+		if !createdModel.CreatedAt.Equal(now) {
+			t.Fatalf("created_at = %v, want %v", createdModel.CreatedAt, now)
+		}
+
+		if !createdModel.UpdatedAt.Equal(now) {
+			t.Fatalf("updated_at = %v, want %v", createdModel.UpdatedAt, now)
+		}
+
+		if got == nil {
+			t.Fatal("expected created task, got nil")
+		}
+	})
+
+	t.Run("invalid input", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			createFn: func(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
+				t.Fatal("repo.Create should not be called")
+				return nil, nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		_, err := svc.Create(context.Background(), CreateInput{
+			Title: "   ",
+		})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			createFn: func(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
+				return nil, errors.New("repo create error")
+			},
+		}
+
+		svc := NewService(repo)
+		svc.now = func() time.Time { return now }
+
+		_, err := svc.Create(context.Background(), CreateInput{
+			Title:          "Task",
+			Description:    "desc",
+			RecurrenceType: taskdomain.RecurrenceNone,
+		})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestService_GetByID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		expected := &taskdomain.Task{
+			ID:             10,
+			Title:          "Task",
+			Description:    "desc",
+			Status:         taskdomain.StatusNew,
+			RecurrenceType: taskdomain.RecurrenceNone,
+		}
+
+		repo := &mockRepository{
+			getByIDFn: func(ctx context.Context, id int64) (*taskdomain.Task, error) {
+				if id != 10 {
+					t.Fatalf("id = %d, want %d", id, 10)
+				}
+				return expected, nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		got, err := svc.GetByID(context.Background(), 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if got != expected {
+			t.Fatalf("got = %#v, want %#v", got, expected)
+		}
+	})
+
+	t.Run("invalid id", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			getByIDFn: func(ctx context.Context, id int64) (*taskdomain.Task, error) {
+				t.Fatal("repo.GetByID should not be called")
+				return nil, nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		_, err := svc.GetByID(context.Background(), 0)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			getByIDFn: func(ctx context.Context, id int64) (*taskdomain.Task, error) {
+				return nil, errors.New("repo get error")
+			},
+		}
+
+		svc := NewService(repo)
+
+		_, err := svc.GetByID(context.Background(), 10)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestService_Update(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+
+	t.Run("success with normalized input and updated_at", func(t *testing.T) {
+		t.Parallel()
+
+		var updatedModel *taskdomain.Task
+
+		repo := &mockRepository{
+			updateFn: func(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
+				updatedModel = task
+				return task, nil
+			},
+		}
+
+		svc := NewService(repo)
+		svc.now = func() time.Time { return now }
+
+		input := UpdateInput{
+			Title:            "  Updated task  ",
+			Description:      "  updated desc  ",
+			Status:           taskdomain.StatusInProgress,
+			RecurrenceType:   taskdomain.RecurrenceDailyEveryN,
+			RecurrenceConfig: json.RawMessage(`{"every":2}`),
+		}
+
+		got, err := svc.Update(context.Background(), 7, input)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if updatedModel == nil {
+			t.Fatal("expected repo.Update to be called")
+		}
+
+		if updatedModel.ID != 7 {
+			t.Fatalf("id = %d, want %d", updatedModel.ID, 7)
+		}
+
+		if updatedModel.Title != "Updated task" {
+			t.Fatalf("title = %q, want %q", updatedModel.Title, "Updated task")
+		}
+
+		if updatedModel.Description != "updated desc" {
+			t.Fatalf("description = %q, want %q", updatedModel.Description, "updated desc")
+		}
+
+		if updatedModel.Status != taskdomain.StatusInProgress {
+			t.Fatalf("status = %q, want %q", updatedModel.Status, taskdomain.StatusInProgress)
+		}
+
+		if updatedModel.RecurrenceType != taskdomain.RecurrenceDailyEveryN {
+			t.Fatalf("recurrence type = %q, want %q", updatedModel.RecurrenceType, taskdomain.RecurrenceDailyEveryN)
+		}
+
+		if string(updatedModel.RecurrenceConfig) != `{"every":2}` {
+			t.Fatalf("recurrence config = %s, want %s", string(updatedModel.RecurrenceConfig), `{"every":2}`)
+		}
+
+		if !updatedModel.UpdatedAt.Equal(now) {
+			t.Fatalf("updated_at = %v, want %v", updatedModel.UpdatedAt, now)
+		}
+
+		if got == nil {
+			t.Fatal("expected updated task, got nil")
+		}
+	})
+
+	t.Run("invalid id", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			updateFn: func(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
+				t.Fatal("repo.Update should not be called")
+				return nil, nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		_, err := svc.Update(context.Background(), 0, UpdateInput{
+			Title:          "Task",
+			Description:    "desc",
+			Status:         taskdomain.StatusNew,
+			RecurrenceType: taskdomain.RecurrenceNone,
+		})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("invalid input", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			updateFn: func(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
+				t.Fatal("repo.Update should not be called")
+				return nil, nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		_, err := svc.Update(context.Background(), 7, UpdateInput{
+			Title:          "   ",
+			Description:    "desc",
+			Status:         taskdomain.StatusNew,
+			RecurrenceType: taskdomain.RecurrenceNone,
+		})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			updateFn: func(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
+				return nil, errors.New("repo update error")
+			},
+		}
+
+		svc := NewService(repo)
+		svc.now = func() time.Time { return now }
+
+		_, err := svc.Update(context.Background(), 7, UpdateInput{
+			Title:          "Task",
+			Description:    "desc",
+			Status:         taskdomain.StatusNew,
+			RecurrenceType: taskdomain.RecurrenceNone,
+		})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestService_Delete(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		var gotID int64
+
+		repo := &mockRepository{
+			deleteFn: func(ctx context.Context, id int64) error {
+				gotID = id
+				return nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		err := svc.Delete(context.Background(), 15)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if gotID != 15 {
+			t.Fatalf("id = %d, want %d", gotID, 15)
+		}
+	})
+
+	t.Run("invalid id", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			deleteFn: func(ctx context.Context, id int64) error {
+				t.Fatal("repo.Delete should not be called")
+				return nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		err := svc.Delete(context.Background(), 0)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			deleteFn: func(ctx context.Context, id int64) error {
+				return errors.New("repo delete error")
+			},
+		}
+
+		svc := NewService(repo)
+
+		err := svc.Delete(context.Background(), 15)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestService_List(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		expected := []taskdomain.Task{
+			{
+				ID:             1,
+				Title:          "Task 1",
+				Description:    "desc 1",
+				Status:         taskdomain.StatusNew,
+				RecurrenceType: taskdomain.RecurrenceNone,
+			},
+			{
+				ID:             2,
+				Title:          "Task 2",
+				Description:    "desc 2",
+				Status:         taskdomain.StatusInProgress,
+				RecurrenceType: taskdomain.RecurrenceEvenDays,
+			},
+		}
+
+		repo := &mockRepository{
+			listFn: func(ctx context.Context) ([]taskdomain.Task, error) {
+				return expected, nil
+			},
+		}
+
+		svc := NewService(repo)
+
+		got, err := svc.List(context.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if len(got) != len(expected) {
+			t.Fatalf("len = %d, want %d", len(got), len(expected))
+		}
+
+		for i := range expected {
+			if got[i].ID != expected[i].ID {
+				t.Fatalf("got[%d].ID = %d, want %d", i, got[i].ID, expected[i].ID)
+			}
+		}
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &mockRepository{
+			listFn: func(ctx context.Context) ([]taskdomain.Task, error) {
+				return nil, errors.New("repo list error")
+			},
+		}
+
+		svc := NewService(repo)
+
+		_, err := svc.List(context.Background())
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
