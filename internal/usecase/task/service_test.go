@@ -312,11 +312,41 @@ func TestService_Complete(t *testing.T) {
 			wantScheduled: time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC),
 		},
 		{
-			name: "specific dates without next occurrence marks done",
+			name: "monthly recurrence reschedules task",
 			id:   3,
 			task: &taskdomain.Task{
 				ID:               3,
+				Title:            "Monthly task",
+				Description:      "desc",
+				Status:           taskdomain.StatusInProgress,
+				ScheduledAt:      time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+				RecurrenceType:   taskdomain.RecurrenceMonthlyDay,
+				RecurrenceConfig: json.RawMessage(`{"day":15}`),
+			},
+			wantStatus:    taskdomain.StatusNew,
+			wantScheduled: time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "specific dates recurrence reschedules to next occurrence",
+			id:   4,
+			task: &taskdomain.Task{
+				ID:               4,
 				Title:            "Specific dates task",
+				Description:      "desc",
+				Status:           taskdomain.StatusInProgress,
+				ScheduledAt:      time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+				RecurrenceType:   taskdomain.RecurrenceSpecificDates,
+				RecurrenceConfig: json.RawMessage(`{"dates":["2026-04-20T10:00:00Z","2026-04-25T10:00:00Z","2026-05-01T10:00:00Z"]}`),
+			},
+			wantStatus:    taskdomain.StatusNew,
+			wantScheduled: time.Date(2026, 4, 25, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "specific dates without next occurrence marks done",
+			id:   5,
+			task: &taskdomain.Task{
+				ID:               5,
+				Title:            "Specific dates exhausted task",
 				Description:      "desc",
 				Status:           taskdomain.StatusInProgress,
 				ScheduledAt:      time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC),
@@ -333,9 +363,9 @@ func TestService_Complete(t *testing.T) {
 		},
 		{
 			name: "recurring task without scheduled_at returns error",
-			id:   4,
+			id:   6,
 			task: &taskdomain.Task{
-				ID:               4,
+				ID:               6,
 				Title:            "Broken recurring task",
 				Description:      "desc",
 				Status:           taskdomain.StatusInProgress,
@@ -346,9 +376,9 @@ func TestService_Complete(t *testing.T) {
 		},
 		{
 			name: "invalid recurrence config returns error",
-			id:   5,
+			id:   7,
 			task: &taskdomain.Task{
-				ID:               5,
+				ID:               7,
 				Title:            "Bad recurrence config",
 				Description:      "desc",
 				Status:           taskdomain.StatusInProgress,
@@ -360,15 +390,15 @@ func TestService_Complete(t *testing.T) {
 		},
 		{
 			name:    "repository get by id error",
-			id:      6,
+			id:      8,
 			getErr:  errors.New("repo get error"),
 			wantErr: true,
 		},
 		{
 			name: "repository update error",
-			id:   7,
+			id:   9,
 			task: &taskdomain.Task{
-				ID:             7,
+				ID:             9,
 				Title:          "One time task",
 				Description:    "desc",
 				Status:         taskdomain.StatusNew,
@@ -385,6 +415,8 @@ func TestService_Complete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			var updatedTask *taskdomain.Task
+
 			repo := &mockRepository{
 				getByIDFn: func(ctx context.Context, id int64) (*taskdomain.Task, error) {
 					if tt.getErr != nil {
@@ -396,6 +428,7 @@ func TestService_Complete(t *testing.T) {
 					if tt.updateErr != nil {
 						return nil, tt.updateErr
 					}
+					updatedTask = task
 					return task, nil
 				},
 			}
@@ -415,6 +448,10 @@ func TestService_Complete(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
+			if updatedTask == nil {
+				t.Fatal("expected update to be called")
+			}
+
 			if got.Status != tt.wantStatus {
 				t.Fatalf("expected status %q, got %q", tt.wantStatus, got.Status)
 			}
@@ -425,6 +462,18 @@ func TestService_Complete(t *testing.T) {
 
 			if !got.UpdatedAt.Equal(now) {
 				t.Fatalf("expected updated_at %v, got %v", now, got.UpdatedAt)
+			}
+
+			if updatedTask.Status != tt.wantStatus {
+				t.Fatalf("updated task status = %q, want %q", updatedTask.Status, tt.wantStatus)
+			}
+
+			if !updatedTask.ScheduledAt.Equal(tt.wantScheduled) {
+				t.Fatalf("updated task scheduled_at = %v, want %v", updatedTask.ScheduledAt, tt.wantScheduled)
+			}
+
+			if !updatedTask.UpdatedAt.Equal(now) {
+				t.Fatalf("updated task updated_at = %v, want %v", updatedTask.UpdatedAt, now)
 			}
 		})
 	}
