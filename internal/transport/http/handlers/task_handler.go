@@ -27,14 +27,16 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	recurrenceType, recurrenceConfig := extractRecurrence(req)
+
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
 		Title:            req.Title,
 		Description:      req.Description,
 		Status:           req.Status,
 		ScheduledAt:      req.ScheduledAt,
-		RecurrenceType:   req.RecurrenceType,
-		RecurrenceConfig: req.RecurrenceConfig,
-})
+		RecurrenceType:   recurrenceType,
+		RecurrenceConfig: recurrenceConfig,
+	})
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -72,14 +74,16 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	recurrenceType, recurrenceConfig := extractRecurrence(req)
+
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
 		Title:            req.Title,
 		Description:      req.Description,
 		Status:           req.Status,
 		ScheduledAt:      req.ScheduledAt,
-		RecurrenceType:   req.RecurrenceType,
-		RecurrenceConfig: req.RecurrenceConfig,
-})
+		RecurrenceType:   recurrenceType,
+		RecurrenceConfig: recurrenceConfig,
+	})
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -116,6 +120,14 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func extractRecurrence(req taskMutationDTO) (taskdomain.RecurrenceType, json.RawMessage) {
+	if req.Recurrence == nil {
+		return taskdomain.RecurrenceNone, nil
+	}
+
+	return req.Recurrence.Type, req.Recurrence.Config
 }
 
 func getIDFromRequest(r *http.Request) (int64, error) {
