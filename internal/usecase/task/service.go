@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"errors"
 
 	taskdomain "example.com/taskservice/internal/domain/task"
 )
@@ -171,4 +172,59 @@ func normalizeRecurrence(
 	}
 
 	return normalizedType, normalizedConfig, nil
+}
+
+func (s *Service) Complete(ctx context.Context, id int64) (*taskdomain.Task, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+	}
+
+	model, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+
+	if model.RecurrenceType == taskdomain.RecurrenceNone {
+		model.Status = taskdomain.StatusDone
+		model.UpdatedAt = now
+		return s.repo.Update(ctx, model)
+	}
+
+	if model.ScheduledAt.IsZero() {
+		return nil, fmt.Errorf("%w: scheduled_at is required for recurring task", ErrInvalidInput)
+	}
+
+	rule, err := taskdomain.DecodeRule(model.RecurrenceType, model.RecurrenceConfig)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid recurrence: %v", ErrInvalidInput, err)
+	}
+
+	if rule == nil {
+		model.Status = taskdomain.StatusDone
+		model.UpdatedAt = now
+		return s.repo.Update(ctx, model)
+	}
+
+	if err := rule.Validate(); err != nil {
+		return nil, fmt.Errorf("%w: invalid recurrence: %v", ErrInvalidInput, err)
+	}
+
+	next, err := rule.Next(model.ScheduledAt)
+	if err != nil {
+		if errors.Is(err, taskdomain.ErrNoNextDate) {
+			model.Status = taskdomain.StatusDone
+			model.UpdatedAt = now
+			return s.repo.Update(ctx, model)
+		}
+
+		return nil, fmt.Errorf("%w: failed to calculate next occurrence: %v", ErrInvalidInput, err)
+	}
+
+	model.Status = taskdomain.StatusNew
+	model.ScheduledAt = next
+	model.UpdatedAt = now
+
+	return s.repo.Update(ctx, model)
 }

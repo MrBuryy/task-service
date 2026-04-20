@@ -21,6 +21,7 @@ type Usecase interface {
 	Update(ctx context.Context, id int64, input UpdateInput) (*taskdomain.Task, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context) ([]taskdomain.Task, error)
+	Complete(ctx context.Context, id int64) (*taskdomain.Task, error)
 }
 
 type CreateInput struct {
