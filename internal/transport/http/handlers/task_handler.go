@@ -122,6 +122,22 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
+	id, err := getIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	completed, err := h.usecase.Complete(r.Context(), id)
+	if err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newTaskDTO(completed))
+}
+
 func extractRecurrence(req taskMutationDTO) (taskdomain.RecurrenceType, json.RawMessage) {
 	if req.Recurrence == nil {
 		return taskdomain.RecurrenceNone, nil

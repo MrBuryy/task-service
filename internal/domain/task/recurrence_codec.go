@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	ErrUnknownRule           = errors.New("unknown recurrence rule")
+	ErrUnknownRule             = errors.New("unknown recurrence rule")
 	ErrInvalidRecurrenceConfig = errors.New("invalid recurrence config")
-	ErrRuleTypeMismatch      = errors.New("rule type mismatch")
+	ErrRuleTypeMismatch        = errors.New("rule type mismatch")
 )
 
 type DailyEveryNConfig struct {

@@ -10,7 +10,7 @@ import (
 
 type unknownRule struct{}
 
-func (u unknownRule) Validate() error                  { return nil }
+func (u unknownRule) Validate() error                        { return nil }
 func (u unknownRule) Next(from time.Time) (time.Time, error) { return time.Time{}, nil }
 
 func TestDecodeRule(t *testing.T) {

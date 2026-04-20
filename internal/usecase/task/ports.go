@@ -7,6 +7,7 @@ import (
 
 	taskdomain "example.com/taskservice/internal/domain/task"
 )
+
 type Repository interface {
 	Create(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error)
 	GetByID(ctx context.Context, id int64) (*taskdomain.Task, error)
