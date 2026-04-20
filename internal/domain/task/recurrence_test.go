@@ -91,9 +91,61 @@ func TestRecurrenceRule(t *testing.T) {
 		}
 	})
 
-	t.Run("unknown type returns error", func(t *testing.T) {
+	t.Run("specific dates returns SpecificDatesRule", func(t *testing.T) {
 		r := Recurrence{
 			Type: RecurrenceSpecificDates,
+			SpecificDates: []time.Time{
+				time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+			},
+		}
+
+		rule, err := r.Rule()
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+
+		specific, ok := rule.(SpecificDatesRule)
+		if !ok {
+			t.Fatalf("expected SpecificDatesRule, got %T", rule)
+		}
+		if len(specific.Dates) != 1 {
+			t.Fatalf("expected 1 date, got %d", len(specific.Dates))
+		}
+	})
+
+	t.Run("even days returns EvenDaysRule", func(t *testing.T) {
+		r := Recurrence{
+			Type: RecurrenceEvenDays,
+		}
+
+		rule, err := r.Rule()
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+
+		if _, ok := rule.(EvenDaysRule); !ok {
+			t.Fatalf("expected EvenDaysRule, got %T", rule)
+		}
+	})
+
+	t.Run("odd days returns OddDaysRule", func(t *testing.T) {
+		r := Recurrence{
+			Type: RecurrenceOddDays,
+		}
+
+		rule, err := r.Rule()
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+
+		if _, ok := rule.(OddDaysRule); !ok {
+			t.Fatalf("expected OddDaysRule, got %T", rule)
+		}
+	})
+
+	t.Run("unknown type returns error", func(t *testing.T) {
+		r := Recurrence{
+			Type: RecurrenceType("unexpected_type"),
 		}
 
 		rule, err := r.Rule()
@@ -289,6 +341,174 @@ func TestMonthlyDayRuleNext(t *testing.T) {
 			}
 			if !got.Equal(tt.want) {
 				t.Fatalf("expected time %v, got %v", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestSpecificDatesRuleValidate(t *testing.T) {
+	t.Run("empty dates", func(t *testing.T) {
+		rule := SpecificDatesRule{}
+		err := rule.Validate()
+		if !errors.Is(err, ErrNoSpecificDates) {
+			t.Fatalf("expected %v, got %v", ErrNoSpecificDates, err)
+		}
+	})
+
+	t.Run("zero date", func(t *testing.T) {
+		rule := SpecificDatesRule{
+			Dates: []time.Time{time.Time{}},
+		}
+		err := rule.Validate()
+		if !errors.Is(err, ErrInvalidSpecificDate) {
+			t.Fatalf("expected %v, got %v", ErrInvalidSpecificDate, err)
+		}
+	})
+
+	t.Run("valid dates", func(t *testing.T) {
+		rule := SpecificDatesRule{
+			Dates: []time.Time{
+				time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+			},
+		}
+		err := rule.Validate()
+		if err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+	})
+}
+
+func TestSpecificDatesRuleNext(t *testing.T) {
+	t.Run("returns nearest next date", func(t *testing.T) {
+		rule := SpecificDatesRule{
+			Dates: []time.Time{
+				time.Date(2026, 4, 25, 10, 0, 0, 0, time.UTC),
+				time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC),
+				time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC),
+			},
+		}
+
+		from := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+
+		got, err := rule.Next(from)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+
+		want := time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC)
+		if !got.Equal(want) {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
+	})
+
+	t.Run("skips equal date and returns strictly next", func(t *testing.T) {
+		rule := SpecificDatesRule{
+			Dates: []time.Time{
+				time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+				time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC),
+			},
+		}
+
+		from := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+
+		got, err := rule.Next(from)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+
+		want := time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC)
+		if !got.Equal(want) {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
+	})
+
+	t.Run("returns error when no next date", func(t *testing.T) {
+		rule := SpecificDatesRule{
+			Dates: []time.Time{
+				time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+			},
+		}
+
+		from := time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC)
+
+		_, err := rule.Next(from)
+		if !errors.Is(err, ErrNoNextDate) {
+			t.Fatalf("expected %v, got %v", ErrNoNextDate, err)
+		}
+	})
+}
+
+func TestEvenDaysRuleNext(t *testing.T) {
+	tests := []struct {
+		name string
+		from time.Time
+		want time.Time
+	}{
+		{
+			name: "from odd day",
+			from: time.Date(2026, 4, 19, 10, 0, 0, 0, time.UTC),
+			want: time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "from even day returns next even day",
+			from: time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+			want: time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "cross month boundary",
+			from: time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC),
+			want: time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC),
+		},
+	}
+
+	rule := EvenDaysRule{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rule.Next(tt.from)
+			if err != nil {
+				t.Fatalf("expected nil error, got %v", err)
+			}
+			if !got.Equal(tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestOddDaysRuleNext(t *testing.T) {
+	tests := []struct {
+		name string
+		from time.Time
+		want time.Time
+	}{
+		{
+			name: "from even day",
+			from: time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+			want: time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "from odd day returns next odd day",
+			from: time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC),
+			want: time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "cross month boundary",
+			from: time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC),
+			want: time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC),
+		},
+	}
+
+	rule := OddDaysRule{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rule.Next(tt.from)
+			if err != nil {
+				t.Fatalf("expected nil error, got %v", err)
+			}
+			if !got.Equal(tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, got)
 			}
 		})
 	}

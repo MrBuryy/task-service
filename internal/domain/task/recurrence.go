@@ -2,6 +2,7 @@ package task
 
 import (
 	"errors"
+	"slices"
 	"time"
 )
 
@@ -18,9 +19,10 @@ const (
 )
 
 type Recurrence struct {
-	Type       RecurrenceType
-	EveryNDays *int
-	DayOfMonth *int
+	Type          RecurrenceType
+	EveryNDays    *int
+	DayOfMonth    *int
+	SpecificDates []time.Time
 }
 
 // Rule defines behavior for calculating the next occurrence.
@@ -33,6 +35,10 @@ var (
 	ErrUnknownRecurrenceType = errors.New("unknown recurrence type")
 	ErrInvalidEvery          = errors.New("every must be greater than 0")
 	ErrInvalidDayOfMonth     = errors.New("day of month must be between 1 and 30")
+
+	ErrNoSpecificDates     = errors.New("specific dates are required")
+	ErrInvalidSpecificDate = errors.New("specific date is zero")
+	ErrNoNextDate          = errors.New("no next date")
 )
 
 func (r Recurrence) Rule() (Rule, error) {
@@ -51,6 +57,15 @@ func (r Recurrence) Rule() (Rule, error) {
 			return nil, ErrInvalidDayOfMonth
 		}
 		return MonthlyDayRule{Day: *r.DayOfMonth}, nil
+
+	case RecurrenceSpecificDates:
+		return SpecificDatesRule{Dates: r.SpecificDates}, nil
+
+	case RecurrenceEvenDays:
+		return EvenDaysRule{}, nil
+
+	case RecurrenceOddDays:
+		return OddDaysRule{}, nil
 
 	default:
 		return nil, ErrUnknownRecurrenceType
@@ -107,4 +122,87 @@ func (r MonthlyDayRule) Next(from time.Time) (time.Time, error) {
 	}
 
 	return time.Time{}, ErrInvalidDayOfMonth
+}
+
+type SpecificDatesRule struct {
+	Dates []time.Time
+}
+
+func (r SpecificDatesRule) Validate() error {
+	if len(r.Dates) == 0 {
+		return ErrNoSpecificDates
+	}
+
+	for _, d := range r.Dates {
+		if d.IsZero() {
+			return ErrInvalidSpecificDate
+		}
+	}
+
+	return nil
+}
+
+func (r SpecificDatesRule) Next(from time.Time) (time.Time, error) {
+	if err := r.Validate(); err != nil {
+		return time.Time{}, err
+	}
+
+	dates := make([]time.Time, 0, len(r.Dates))
+	for _, d := range r.Dates {
+		dates = append(dates, d.UTC())
+	}
+
+	slices.SortFunc(dates, func(a, b time.Time) int {
+		if a.Before(b) {
+			return -1
+		}
+		if a.After(b) {
+			return 1
+		}
+		return 0
+	})
+
+	from = from.UTC()
+
+	for _, d := range dates {
+		if d.After(from) {
+			return d, nil
+		}
+	}
+
+	return time.Time{}, ErrNoNextDate
+}
+
+type EvenDaysRule struct{}
+
+func (r EvenDaysRule) Validate() error {
+	return nil
+}
+
+func (r EvenDaysRule) Next(from time.Time) (time.Time, error) {
+	next := from.AddDate(0, 0, 1)
+
+	for {
+		if next.Day()%2 == 0 {
+			return next, nil
+		}
+		next = next.AddDate(0, 0, 1)
+	}
+}
+
+type OddDaysRule struct{}
+
+func (r OddDaysRule) Validate() error {
+	return nil
+}
+
+func (r OddDaysRule) Next(from time.Time) (time.Time, error) {
+	next := from.AddDate(0, 0, 1)
+
+	for {
+		if next.Day()%2 != 0 {
+			return next, nil
+		}
+		next = next.AddDate(0, 0, 1)
+	}
 }
