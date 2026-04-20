@@ -266,3 +266,57 @@ func jsonEqual(a, b []byte) bool {
 
 	return reflect.DeepEqual(va, vb)
 }
+
+func TestEncodeDecodeRule_RoundTrip_SpecificDates(t *testing.T) {
+	t.Parallel()
+
+	date1 := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	date2 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	date3 := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+
+	original := SpecificDatesRule{
+		Dates: []time.Time{date1, date2, date3},
+	}
+
+	rType, config, err := EncodeRule(original)
+	if err != nil {
+		t.Fatalf("EncodeRule() error = %v", err)
+	}
+
+	if rType != RecurrenceSpecificDates {
+		t.Fatalf("type = %q, want %q", rType, RecurrenceSpecificDates)
+	}
+
+	decoded, err := DecodeRule(rType, config)
+	if err != nil {
+		t.Fatalf("DecodeRule() error = %v", err)
+	}
+
+	specificRule, ok := decoded.(SpecificDatesRule)
+	if !ok {
+		t.Fatalf("decoded rule type = %T, want %T", decoded, SpecificDatesRule{})
+	}
+
+	if len(specificRule.Dates) != 3 {
+		t.Fatalf("len(dates) = %d, want %d", len(specificRule.Dates), 3)
+	}
+
+	if !specificRule.Dates[0].Equal(date1) {
+		t.Fatalf("date[0] = %v, want %v", specificRule.Dates[0], date1)
+	}
+	if !specificRule.Dates[1].Equal(date2) {
+		t.Fatalf("date[1] = %v, want %v", specificRule.Dates[1], date2)
+	}
+	if !specificRule.Dates[2].Equal(date3) {
+		t.Fatalf("date[2] = %v, want %v", specificRule.Dates[2], date3)
+	}
+
+	gotNext, err := specificRule.Next(date2)
+	if err != nil {
+		t.Fatalf("decoded rule Next() error = %v", err)
+	}
+
+	if !gotNext.Equal(date3) {
+		t.Fatalf("decoded rule Next() = %v, want %v", gotNext, date3)
+	}
+}

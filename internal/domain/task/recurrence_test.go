@@ -513,3 +513,91 @@ func TestOddDaysRuleNext(t *testing.T) {
 		})
 	}
 }
+
+func TestSpecificDatesRule_Next_FromEqualsExistingDate(t *testing.T) {
+	t.Parallel()
+
+	date1 := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	date2 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	date3 := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+
+	rule := SpecificDatesRule{
+		Dates: []time.Time{date1, date2, date3},
+	}
+
+	got, err := rule.Next(date2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !got.Equal(date3) {
+		t.Fatalf("got = %v, want %v", got, date3)
+	}
+}
+
+func TestSpecificDatesRule_Next_NoNextDate(t *testing.T) {
+	t.Parallel()
+
+	date1 := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	date2 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+
+	rule := SpecificDatesRule{
+		Dates: []time.Time{date1, date2},
+	}
+
+	_, err := rule.Next(date2)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestMonthlyDayRule_Next_YearBoundary(t *testing.T) {
+	t.Parallel()
+
+	rule := MonthlyDayRule{Day: 5}
+	from := time.Date(2026, 12, 20, 12, 0, 0, 0, time.UTC)
+
+	got, err := rule.Next(from)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := time.Date(2027, 1, 5, 12, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("got = %v, want %v", got, want)
+	}
+}
+
+func TestEvenDaysRule_Next_YearBoundary(t *testing.T) {
+	t.Parallel()
+
+	rule := EvenDaysRule{}
+	from := time.Date(2026, 12, 31, 9, 30, 0, 0, time.UTC)
+
+	got, err := rule.Next(from)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := time.Date(2027, 1, 2, 9, 30, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("got = %v, want %v", got, want)
+	}
+}
+
+func TestOddDaysRule_Next_YearBoundary(t *testing.T) {
+	t.Parallel()
+
+	rule := OddDaysRule{}
+	from := time.Date(2026, 12, 31, 9, 30, 0, 0, time.UTC)
+
+	got, err := rule.Next(from)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := time.Date(2027, 1, 1, 9, 30, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("got = %v, want %v", got, want)
+	}
+}
