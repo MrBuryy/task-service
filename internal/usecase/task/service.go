@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -34,7 +35,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		ScheduledAt:      normalized.ScheduledAt,
 		RecurrenceType:   normalized.RecurrenceType,
 		RecurrenceConfig: normalized.RecurrenceConfig,
-}
+	}
+
 	now := s.now()
 	model.CreatedAt = now
 	model.UpdatedAt = now
@@ -74,7 +76,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		RecurrenceType:   normalized.RecurrenceType,
 		RecurrenceConfig: normalized.RecurrenceConfig,
 		UpdatedAt:        s.now(),
-}
+	}
 
 	updated, err := s.repo.Update(ctx, model)
 	if err != nil {
@@ -112,6 +114,14 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	recType, recConfig, err := normalizeRecurrence(input.RecurrenceType, input.RecurrenceConfig)
+	if err != nil {
+		return CreateInput{}, err
+	}
+
+	input.RecurrenceType = recType
+	input.RecurrenceConfig = recConfig
+
 	return input, nil
 }
 
@@ -127,5 +137,38 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	recType, recConfig, err := normalizeRecurrence(input.RecurrenceType, input.RecurrenceConfig)
+	if err != nil {
+		return UpdateInput{}, err
+	}
+
+	input.RecurrenceType = recType
+	input.RecurrenceConfig = recConfig
+
 	return input, nil
+}
+
+func normalizeRecurrence(
+	recType taskdomain.RecurrenceType,
+	recConfig json.RawMessage,
+) (taskdomain.RecurrenceType, json.RawMessage, error) {
+	rule, err := taskdomain.DecodeRule(recType, recConfig)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: invalid recurrence: %v", ErrInvalidInput, err)
+	}
+
+	if rule == nil {
+		return taskdomain.RecurrenceNone, nil, nil
+	}
+
+	if err := rule.Validate(); err != nil {
+		return "", nil, fmt.Errorf("%w: invalid recurrence: %v", ErrInvalidInput, err)
+	}
+
+	normalizedType, normalizedConfig, err := taskdomain.EncodeRule(rule)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: failed to encode recurrence: %v", ErrInvalidInput, err)
+	}
+
+	return normalizedType, normalizedConfig, nil
 }
