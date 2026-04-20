@@ -601,3 +601,46 @@ func TestOddDaysRule_Next_YearBoundary(t *testing.T) {
 		t.Fatalf("got = %v, want %v", got, want)
 	}
 }
+func TestSpecificDatesRuleNext_SkipsDatesLessThanOrEqualToFrom(t *testing.T) {
+	from := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
+
+	rule := SpecificDatesRule{
+		Dates: []time.Time{
+			time.Date(2026, 4, 5, 10, 0, 0, 0, time.UTC),  // меньше from
+			time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC), // равно from
+			time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC), // первая подходящая
+			time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC),
+		},
+	}
+
+	got, err := rule.Next(from)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	want := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestSpecificDatesRuleNext_ReturnsErrNoNextDateWhenAllDatesAreLessThanOrEqualToFrom(t *testing.T) {
+	from := time.Date(2026, 4, 25, 10, 0, 0, 0, time.UTC)
+
+	rule := SpecificDatesRule{
+		Dates: []time.Time{
+			time.Date(2026, 4, 5, 10, 0, 0, 0, time.UTC),
+			time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC),
+			time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC),
+			time.Date(2026, 4, 25, 10, 0, 0, 0, time.UTC), // равно from
+		},
+	}
+
+	got, err := rule.Next(from)
+	if !errors.Is(err, ErrNoNextDate) {
+		t.Fatalf("expected ErrNoNextDate, got %v", err)
+	}
+	if !got.IsZero() {
+		t.Fatalf("expected zero time, got %v", got)
+	}
+}
