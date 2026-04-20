@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Task Service API",
-    "version": "1.1.0",
-    "description": "CRUD API for tasks with support for scheduled and recurring tasks."
+    "version": "1.2.0",
+    "description": "CRUD API for tasks with support for scheduled and recurring tasks. Recurring tasks are configured via the recurrence object."
   },
   "servers": [
     {
@@ -21,6 +21,8 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "List tasks",
+        "description": "Returns all tasks.",
+        "operationId": "listTasks",
         "responses": {
           "200": {
             "description": "Task list",
@@ -30,6 +32,42 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/Task"
+                  }
+                },
+                "examples": {
+                  "oneTimeTaskList": {
+                    "summary": "List with one-time task",
+                    "value": [
+                      {
+                        "id": 1,
+                        "title": "Prepare release",
+                        "description": "Collect release notes and check migrations",
+                        "status": "new",
+                        "scheduled_at": "2026-05-01T10:00:00Z",
+                        "created_at": "2026-03-24T00:00:00Z",
+                        "updated_at": "2026-03-24T00:00:00Z"
+                      }
+                    ]
+                  },
+                  "recurringTaskList": {
+                    "summary": "List with recurring task",
+                    "value": [
+                      {
+                        "id": 2,
+                        "title": "Backup database",
+                        "description": "Run daily backup",
+                        "status": "new",
+                        "scheduled_at": "2026-05-01T10:00:00Z",
+                        "recurrence": {
+                          "type": "daily_every_n",
+                          "config": {
+                            "every": 2
+                          }
+                        },
+                        "created_at": "2026-03-24T00:00:00Z",
+                        "updated_at": "2026-03-24T00:00:00Z"
+                      }
+                    ]
                   }
                 }
               }
@@ -43,12 +81,86 @@
       "post": {
         "tags": ["Tasks"],
         "summary": "Create task",
+        "description": "Creates a new task.",
+        "operationId": "createTask",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateTaskRequest"
+              },
+              "examples": {
+                "oneTimeTask": {
+                  "summary": "One-time task",
+                  "value": {
+                    "title": "Prepare release",
+                    "description": "Collect release notes and check migrations",
+                    "status": "new",
+                    "scheduled_at": "2026-05-01T10:00:00Z"
+                  }
+                },
+                "dailyRecurringTask": {
+                  "summary": "Daily recurring task",
+                  "value": {
+                    "title": "Backup database",
+                    "description": "Run daily backup",
+                    "status": "new",
+                    "scheduled_at": "2026-05-01T10:00:00Z",
+                    "recurrence": {
+                      "type": "daily_every_n",
+                      "config": {
+                        "every": 2
+                      }
+                    }
+                  }
+                },
+                "monthlyRecurringTask": {
+                  "summary": "Monthly recurring task",
+                  "value": {
+                    "title": "Pay rent",
+                    "description": "Monthly apartment payment",
+                    "status": "new",
+                    "scheduled_at": "2026-05-01T10:00:00Z",
+                    "recurrence": {
+                      "type": "monthly_day",
+                      "config": {
+                        "day": 15
+                      }
+                    }
+                  }
+                },
+                "specificDatesTask": {
+                  "summary": "Specific dates recurring task",
+                  "value": {
+                    "title": "Prepare reports",
+                    "description": "Prepare reports for planned dates",
+                    "status": "new",
+                    "scheduled_at": "2026-04-20T10:00:00Z",
+                    "recurrence": {
+                      "type": "specific_dates",
+                      "config": {
+                        "dates": [
+                          "2026-04-20T10:00:00Z",
+                          "2026-05-01T10:00:00Z"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "evenDaysTask": {
+                  "summary": "Even days recurring task",
+                  "value": {
+                    "title": "Check invoices",
+                    "description": "Run every even day",
+                    "status": "new",
+                    "scheduled_at": "2026-05-02T09:00:00Z",
+                    "recurrence": {
+                      "type": "even_days",
+                      "config": {}
+                    }
+                  }
+                }
               }
             }
           }
@@ -60,6 +172,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Task"
+                },
+                "examples": {
+                  "createdOneTimeTask": {
+                    "summary": "Created one-time task",
+                    "value": {
+                      "id": 1,
+                      "title": "Prepare release",
+                      "description": "Collect release notes and check migrations",
+                      "status": "new",
+                      "scheduled_at": "2026-05-01T10:00:00Z",
+                      "created_at": "2026-03-24T00:00:00Z",
+                      "updated_at": "2026-03-24T00:00:00Z"
+                    }
+                  },
+                  "createdRecurringTask": {
+                    "summary": "Created recurring task",
+                    "value": {
+                      "id": 2,
+                      "title": "Backup database",
+                      "description": "Run daily backup",
+                      "status": "new",
+                      "scheduled_at": "2026-05-01T10:00:00Z",
+                      "recurrence": {
+                        "type": "daily_every_n",
+                        "config": {
+                          "every": 2
+                        }
+                      },
+                      "created_at": "2026-03-24T00:00:00Z",
+                      "updated_at": "2026-03-24T00:00:00Z"
+                    }
+                  }
                 }
               }
             }
@@ -77,16 +221,11 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "Get task by ID",
+        "description": "Returns a task by its identifier.",
+        "operationId": "getTaskById",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": 1
-            }
+            "$ref": "#/components/parameters/TaskId"
           }
         ],
         "responses": {
@@ -96,9 +235,44 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Task"
+                },
+                "examples": {
+                  "oneTimeTask": {
+                    "summary": "One-time task",
+                    "value": {
+                      "id": 1,
+                      "title": "Prepare release",
+                      "description": "Collect release notes and check migrations",
+                      "status": "new",
+                      "scheduled_at": "2026-05-01T10:00:00Z",
+                      "created_at": "2026-03-24T00:00:00Z",
+                      "updated_at": "2026-03-24T00:00:00Z"
+                    }
+                  },
+                  "recurringTask": {
+                    "summary": "Recurring task",
+                    "value": {
+                      "id": 2,
+                      "title": "Backup database",
+                      "description": "Run daily backup",
+                      "status": "new",
+                      "scheduled_at": "2026-05-01T10:00:00Z",
+                      "recurrence": {
+                        "type": "daily_every_n",
+                        "config": {
+                          "every": 2
+                        }
+                      },
+                      "created_at": "2026-03-24T00:00:00Z",
+                      "updated_at": "2026-03-24T00:00:00Z"
+                    }
+                  }
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -111,16 +285,11 @@
       "put": {
         "tags": ["Tasks"],
         "summary": "Update task",
+        "description": "Fully updates mutable task fields.",
+        "operationId": "updateTask",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": 1
-            }
+            "$ref": "#/components/parameters/TaskId"
           }
         ],
         "requestBody": {
@@ -129,6 +298,65 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateTaskRequest"
+              },
+              "examples": {
+                "oneTimeTask": {
+                  "summary": "One-time task",
+                  "value": {
+                    "title": "Prepare release",
+                    "description": "Collect release notes and check migrations",
+                    "status": "new",
+                    "scheduled_at": "2026-05-01T10:00:00Z"
+                  }
+                },
+                "dailyRecurringTask": {
+                  "summary": "Daily recurring task",
+                  "value": {
+                    "title": "Backup database",
+                    "description": "Run daily backup",
+                    "status": "new",
+                    "scheduled_at": "2026-05-01T10:00:00Z",
+                    "recurrence": {
+                      "type": "daily_every_n",
+                      "config": {
+                        "every": 2
+                      }
+                    }
+                  }
+                },
+                "monthlyRecurringTask": {
+                  "summary": "Monthly recurring task",
+                  "value": {
+                    "title": "Pay rent",
+                    "description": "Monthly apartment payment",
+                    "status": "new",
+                    "scheduled_at": "2026-05-01T10:00:00Z",
+                    "recurrence": {
+                      "type": "monthly_day",
+                      "config": {
+                        "day": 15
+                      }
+                    }
+                  }
+                },
+                "specificDatesTask": {
+                  "summary": "Specific dates recurring task",
+                  "value": {
+                    "title": "Prepare reports",
+                    "description": "Prepare reports for planned dates",
+                    "status": "new",
+                    "scheduled_at": "2026-04-20T10:00:00Z",
+                    "recurrence": {
+                      "type": "specific_dates",
+                      "config": {
+                        "dates": [
+                          "2026-04-20T10:00:00Z",
+                          "2026-05-01T10:00:00Z"
+                        ]
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -140,6 +368,21 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Task"
+                },
+                "example": {
+                  "id": 1,
+                  "title": "Prepare release",
+                  "description": "Collect release notes and check migrations",
+                  "status": "new",
+                  "scheduled_at": "2026-05-01T10:00:00Z",
+                  "recurrence": {
+                    "type": "daily_every_n",
+                    "config": {
+                      "every": 2
+                    }
+                  },
+                  "created_at": "2026-03-24T00:00:00Z",
+                  "updated_at": "2026-03-25T00:00:00Z"
                 }
               }
             }
@@ -158,21 +401,19 @@
       "delete": {
         "tags": ["Tasks"],
         "summary": "Delete task",
+        "description": "Deletes a task by its identifier.",
+        "operationId": "deleteTask",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": 1
-            }
+            "$ref": "#/components/parameters/TaskId"
           }
         ],
         "responses": {
           "204": {
             "description": "Deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -187,17 +428,11 @@
       "post": {
         "tags": ["Tasks"],
         "summary": "Complete task",
-        "description": "Marks a task as completed. If the task is recurring, calculates the next scheduled occurrence and returns the updated task.",
+        "description": "Marks a task as completed. For recurring tasks, calculates the next scheduled occurrence and returns the updated task.",
+        "operationId": "completeTask",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": 1
-            }
+            "$ref": "#/components/parameters/TaskId"
           }
         ],
         "responses": {
@@ -207,6 +442,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Task"
+                },
+                "examples": {
+                  "completedOneTimeTask": {
+                    "summary": "Completed one-time task",
+                    "value": {
+                      "id": 1,
+                      "title": "Prepare release",
+                      "description": "Collect release notes and check migrations",
+                      "status": "done",
+                      "scheduled_at": "2026-05-01T10:00:00Z",
+                      "created_at": "2026-03-24T00:00:00Z",
+                      "updated_at": "2026-05-01T10:05:00Z"
+                    }
+                  },
+                  "rescheduledRecurringTask": {
+                    "summary": "Recurring task rescheduled after completion",
+                    "value": {
+                      "id": 2,
+                      "title": "Backup database",
+                      "description": "Run daily backup",
+                      "status": "new",
+                      "scheduled_at": "2026-05-03T10:00:00Z",
+                      "recurrence": {
+                        "type": "daily_every_n",
+                        "config": {
+                          "every": 2
+                        }
+                      },
+                      "created_at": "2026-03-24T00:00:00Z",
+                      "updated_at": "2026-05-01T10:05:00Z"
+                    }
+                  }
                 }
               }
             }
@@ -225,6 +492,19 @@
     }
   },
   "components": {
+    "parameters": {
+      "TaskId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Task identifier.",
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        }
+      }
+    },
     "responses": {
       "BadRequest": {
         "description": "Bad request",
@@ -232,6 +512,26 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "invalidRequest": {
+                "summary": "Invalid request",
+                "value": {
+                  "error": "invalid request"
+                }
+              },
+              "invalidTaskId": {
+                "summary": "Invalid task id",
+                "value": {
+                  "error": "invalid task id"
+                }
+              },
+              "invalidRecurrence": {
+                "summary": "Invalid recurrence config",
+                "value": {
+                  "error": "invalid recurrence config"
+                }
+              }
             }
           }
         }
@@ -242,6 +542,14 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "taskNotFound": {
+                "summary": "Task not found",
+                "value": {
+                  "error": "task not found"
+                }
+              }
             }
           }
         }
@@ -252,146 +560,293 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "internalServerError": {
+                "summary": "Internal server error",
+                "value": {
+                  "error": "internal server error"
+                }
+              }
             }
           }
         }
       }
     },
-    "schemas": {
-      "CreateTaskRequest": {
-        "type": "object",
-        "required": ["title"],
-        "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          },
-          "scheduled_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-04-25T10:00:00Z"
-          },
-          "recurrence_type": {
-            "type": "string",
-            "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "even_days", "odd_days"],
-            "example": "daily_every_n"
-          },
-          "recurrence_config": {
-            "type": "object",
-            "nullable": true,
-            "description": "Rule-specific config. daily_every_n: {\"every\":2}, monthly_day: {\"day\":15}, specific_dates: {\"dates\":[\"2026-04-20T10:00:00Z\",\"2026-05-01T10:00:00Z\"]}, even_days: {}, odd_days: {}, none: null",
-            "example": {
-              "every": 2
+  "schemas": {
+    "CreateTaskRequest": {
+      "type": "object",
+      "description": "Payload for creating a task.",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "example": "Prepare release",
+          "description": "Task title."
+        },
+        "description": {
+          "type": "string",
+          "example": "Collect release notes and check migrations",
+          "description": "Task description."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "new",
+            "in_progress",
+            "done"
+          ],
+          "example": "new",
+          "description": "Task status. If omitted, defaults to 'new'."
+        },
+        "scheduled_at": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2026-05-01T10:00:00Z",
+          "description": "Scheduled date in ISO 8601 format. Required for recurring tasks."
+        },
+        "recurrence": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Recurrence"
             }
-          }
+          ],
+          "description": "Recurrence settings. Omit for one-time tasks."
         }
-      },
-      "UpdateTaskRequest": {
-        "type": "object",
-        "required": ["title", "status"],
-        "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "in_progress"
-          },
-          "scheduled_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-04-25T10:00:00Z"
-          },
-          "recurrence_type": {
-            "type": "string",
-            "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "even_days", "odd_days"],
-            "example": "daily_every_n"
-          },
-          "recurrence_config": {
-            "type": "object",
-            "nullable": true,
-            "description": "Rule-specific config. daily_every_n: {\"every\":2}, monthly_day: {\"day\":15}, specific_dates: {\"dates\":[\"2026-04-20T10:00:00Z\",\"2026-05-01T10:00:00Z\"]}, even_days: {}, odd_days: {}, none: null",
-            "example": {
-              "every": 2
+      }
+    },
+    "UpdateTaskRequest": {
+      "type": "object",
+      "description": "Payload for fully updating mutable task fields.",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "status"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "example": "Prepare release",
+          "description": "Task title."
+        },
+        "description": {
+          "type": "string",
+          "example": "Collect release notes and check migrations",
+          "description": "Task description."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "new",
+            "in_progress",
+            "done"
+          ],
+          "example": "in_progress",
+          "description": "Task status."
+        },
+        "scheduled_at": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2026-05-01T10:00:00Z",
+          "description": "Scheduled date in ISO 8601 format. Required for recurring tasks."
+        },
+        "recurrence": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Recurrence"
             }
-          }
+          ],
+          "description": "Recurrence settings. Omit for one-time tasks."
         }
-      },
-      "Task": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "example": 1
-          },
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          },
-          "scheduled_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-04-25T10:00:00Z"
-          },
-          "recurrence_type": {
-            "type": "string",
-            "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "even_days", "odd_days"],
-            "example": "daily_every_n"
-          },
-          "recurrence_config": {
-            "type": "object",
-            "nullable": true,
-            "description": "Rule-specific config.",
-            "example": {
-              "every": 2
+      }
+    },
+    "Task": {
+      "type": "object",
+      "description": "Task resource.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "description",
+        "status",
+        "scheduled_at",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64",
+          "example": 1,
+          "description": "Task identifier."
+        },
+        "title": {
+          "type": "string",
+          "example": "Prepare release",
+          "description": "Task title."
+        },
+        "description": {
+          "type": "string",
+          "example": "Collect release notes and check migrations",
+          "description": "Task description."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "new",
+            "in_progress",
+            "done"
+          ],
+          "example": "new",
+          "description": "Task status."
+        },
+        "scheduled_at": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2026-05-01T10:00:00Z",
+          "description": "Scheduled date in ISO 8601 format."
+        },
+        "recurrence": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Recurrence"
             }
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          }
+          ],
+          "description": "Recurrence settings. Present only for recurring tasks."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2026-03-24T00:00:00Z",
+          "description": "Creation timestamp."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2026-03-24T00:00:00Z",
+          "description": "Last update timestamp."
         }
-      },
-      "Error": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string",
-            "example": "task not found"
+      }
+    },
+    "Recurrence": {
+      "type": "object",
+      "description": "Recurrence information. Omit the whole recurrence object for one-time tasks. If recurrence is provided, type is required.",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "none",
+            "daily_every_n",
+            "monthly_day",
+            "specific_dates",
+            "even_days",
+            "odd_days"
+          ],
+          "example": "daily_every_n",
+          "description": "Recurrence rule type."
+        },
+        "config": {
+          "nullable": true,
+          "description": "Rule-specific config. For daily_every_n use {\"every\": N}; for monthly_day use {\"day\": D}; for specific_dates use {\"dates\": [...]}; for even_days, odd_days, or none use {} or omit config.",
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/DailyEveryNConfig"
+            },
+            {
+              "$ref": "#/components/schemas/MonthlyDayConfig"
+            },
+            {
+              "$ref": "#/components/schemas/SpecificDatesConfig"
+            },
+            {
+              "$ref": "#/components/schemas/EmptyRecurrenceConfig"
+            }
+          ],
+          "example": {
+            "every": 2
           }
         }
       }
+    },
+    "Error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "type": "string",
+          "description": "Human readable error message",
+          "example": "invalid request"
+        }
+      }
+    },
+    "DailyEveryNConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "every"
+      ],
+      "properties": {
+        "every": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Repeat every N days.",
+          "example": 2
+        }
+      }
+    },
+    "MonthlyDayConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "day"
+      ],
+      "properties": {
+        "day": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Day of month to schedule. Supported range is 1..30.",
+          "example": 15
+        }
+      }
+    },
+    "SpecificDatesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dates"
+      ],
+      "properties": {
+        "dates": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Explicit list of occurrences in ISO 8601 format.",
+          "items": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-04-20T10:00:00Z"
+          }
+        }
+      }
+    },
+    "EmptyRecurrenceConfig": {
+      "type": "object",
+      "description": "Empty config used for even_days, odd_days, or none.",
+      "additionalProperties": false,
+      "example": {}
     }
   }
+}
 }
